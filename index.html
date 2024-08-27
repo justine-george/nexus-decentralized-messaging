@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nexus MVP</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+      #myName {
+        font-size: 1.2em;
+        font-weight: bold;
+        padding: 10px;
+        background-color: #f0f0f0;
+      }
+      #chatContainer {
+        display: flex;
+        flex-grow: 1;
+      }
+      #peerList {
+        width: 200px;
+        border-right: 1px solid #ccc;
+        overflow-y: auto;
+      }
+      #peerList div {
+        padding: 10px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      #peerList div:hover {
+        background-color: #f0f0f0;
+      }
+      #peerList div.active {
+        background-color: #e0e0e0;
+      }
+      #chatArea {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+      }
+      #messages {
+        flex-grow: 1;
+        overflow-y: auto;
+        padding: 10px;
+      }
+      #inputArea {
+        display: flex;
+        padding: 10px;
+      }
+      #messageInput {
+        flex-grow: 1;
+        margin-right: 10px;
+      }
+      .sent {
+        text-align: right;
+        color: blue;
+      }
+      .received {
+        text-align: left;
+        color: green;
+      }
+      .unread-count {
+        background-color: #ff4444;
+        color: white;
+        border-radius: 50%;
+        padding: 2px 6px;
+        font-size: 0.8em;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="myName">Your Name: <span id="displayName">Anonymous</span></div>
+    <div id="nameSection">
+      <input type="text" id="nameInput" placeholder="Enter your name" />
+      <button onclick="setName()">Set Name</button>
+    </div>
+    <div id="chatContainer">
+      <div id="peerList"></div>
+      <div id="chatArea">
+        <div id="messages"></div>
+        <div id="inputArea">
+          <input
+            type="text"
+            id="messageInput"
+            placeholder="Type a message"
+            disabled
+          />
+          <button onclick="sendMessage()" id="sendButton" disabled>Send</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const ws = new WebSocket("ws://" + window.location.host + "/ws");
+      let myId = "";
+      let myName = "Anonymous";
+      let peerNames = {};
+      let selectedPeer = null;
+      let conversations = {};
+      let unreadCounts = {};
+
+      ws.onmessage = function (event) {
+        const msg = JSON.parse(event.data);
+        console.log("Received message:", msg); // Debug log
+
+        switch (msg.type) {
+          case "peer_list":
+            peerNames = JSON.parse(msg.content);
+            updatePeerList();
+            break;
+          case "chat":
+            const senderId = msg.fromId === myId ? msg.to : msg.fromId;
+            addMessageToConversation(senderId, msg);
+            if (senderId !== selectedPeer) {
+              incrementUnreadCount(senderId);
+            }
+            if (selectedPeer === senderId) {
+              displayConversation(selectedPeer);
+            }
+            break;
+          case "id_assigned":
+            myId = msg.content;
+            console.log("My ID:", myId); // Debug log
+            break;
+          case "name_updated":
+            if (msg.fromId === myId) {
+              myName = msg.content;
+              document.getElementById("displayName").textContent = myName;
+            } else {
+              peerNames[msg.fromId] = msg.content;
+              updatePeerList();
+            }
+            break;
+          default:
+            console.log("Unknown message type:", msg.type);
+        }
+      };
+
+      function updatePeerList() {
+        const peerListDiv = document.getElementById("peerList");
+        peerListDiv.innerHTML = "";
+        for (const [id, name] of Object.entries(peerNames)) {
+          if (id !== myId) {
+            const peerDiv = document.createElement("div");
+            peerDiv.innerHTML = `
+                        <span>${name}</span>
+                        <span class="unread-count" style="display: none;">0</span>
+                    `;
+            peerDiv.onclick = () => selectPeer(id);
+            peerListDiv.appendChild(peerDiv);
+            updateUnreadCountDisplay(id);
+          }
+        }
+      }
+
+      function selectPeer(peerId) {
+        selectedPeer = peerId;
+        document
+          .querySelectorAll("#peerList div")
+          .forEach((div) => div.classList.remove("active"));
+        const selectedDiv = Array.from(
+          document.querySelectorAll("#peerList div")
+        ).find(
+          (div) => div.firstElementChild.textContent === peerNames[peerId]
+        );
+        if (selectedDiv) selectedDiv.classList.add("active");
+        displayConversation(peerId);
+        document.getElementById("messageInput").disabled = false;
+        document.getElementById("sendButton").disabled = false;
+        resetUnreadCount(peerId);
+      }
+
+      function displayConversation(peerId) {
+        const messagesDiv = document.getElementById("messages");
+        messagesDiv.innerHTML = "";
+        if (conversations[peerId]) {
+          conversations[peerId].forEach((msg) => {
+            const messageClass = msg.fromId === myId ? "sent" : "received";
+            messagesDiv.innerHTML += `<p class="${messageClass}"><strong>${msg.from}:</strong> ${msg.content}</p>`;
+          });
+        }
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
+
+      function addMessageToConversation(peerId, message) {
+        if (!conversations[peerId]) {
+          conversations[peerId] = [];
+        }
+        conversations[peerId].push(message);
+      }
+
+      function sendMessage() {
+        const input = document.getElementById("messageInput");
+        if (selectedPeer && input.value.trim()) {
+          const message = {
+            type: "chat",
+            to: selectedPeer,
+            content: input.value.trim(),
+          };
+          ws.send(JSON.stringify(message));
+          input.value = "";
+        }
+      }
+
+      function setName() {
+        const nameInput = document.getElementById("nameInput");
+        const name = nameInput.value.trim();
+        if (name) {
+          const message = {
+            type: "set_name",
+            content: name,
+          };
+          ws.send(JSON.stringify(message));
+          nameInput.value = "";
+        }
+      }
+
+      function incrementUnreadCount(peerId) {
+        unreadCounts[peerId] = (unreadCounts[peerId] || 0) + 1;
+        updateUnreadCountDisplay(peerId);
+      }
+
+      function resetUnreadCount(peerId) {
+        unreadCounts[peerId] = 0;
+        updateUnreadCountDisplay(peerId);
+      }
+
+      function updateUnreadCountDisplay(peerId) {
+        const peerDiv = Array.from(
+          document.querySelectorAll("#peerList div")
+        ).find(
+          (div) => div.firstElementChild.textContent === peerNames[peerId]
+        );
+        if (peerDiv) {
+          const countSpan = peerDiv.querySelector(".unread-count");
+          if (unreadCounts[peerId] && unreadCounts[peerId] > 0) {
+            countSpan.textContent = unreadCounts[peerId];
+            countSpan.style.display = "inline";
+          } else {
+            countSpan.style.display = "none";
+          }
+        }
+      }
+
+      // Set myId when the WebSocket connection is established
+      ws.onopen = function () {
+        console.log("WebSocket connected"); // Debug log
+        ws.send(JSON.stringify({ type: "get_id" }));
+      };
+
+      // Enable sending message with Enter key
+      document
+        .getElementById("messageInput")
+        .addEventListener("keypress", function (e) {
+          if (e.key === "Enter") {
+            sendMessage();
+          }
+        });
+
+      // Error handling
+      ws.onerror = function (error) {
+        console.error("WebSocket Error:", error);
+      };
+
+      ws.onclose = function (event) {
+        console.log("WebSocket Disconnected:", event);
+      };
+    </script>
+  </body>
+</html>
