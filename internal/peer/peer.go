@@ -5,8 +5,8 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
+	"github.com/justine-george/nexus-decentralized-messaging/pkg/message"
 	"github.com/pion/webrtc/v3"
-	"github.com/yourusername/nexus/pkg/message"
 )
 
 type Peer struct {
