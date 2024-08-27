@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Nexus MVP</title>
     <style>
+      :root {
+        --primary-color: #8e8aa8;
+        --primary-light: #f0f0f5;
+        --primary-dark: #5a5775;
+        --text-color: #333;
+        --bg-color: #fafafa;
+      }
       body {
         font-family: Arial, sans-serif;
         margin: 0;
@@ -12,12 +19,46 @@
         display: flex;
         flex-direction: column;
         height: 100vh;
+        background-color: var(--bg-color);
+        color: var(--text-color);
       }
-      #myName {
-        font-size: 1.2em;
+      #welcomeSection {
+        background-color: var(--primary-color);
+        color: white;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+      }
+      #welcomeMessage {
+        font-size: 1.5em;
+        margin-right: 10px;
         font-weight: bold;
-        padding: 10px;
-        background-color: #f0f0f0;
+      }
+      #nameDisplay {
+        font-size: 1.5em;
+        font-weight: bold;
+        margin-right: 10px;
+      }
+      #editNameBtn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 1.2em;
+        padding: 5px;
+        color: white;
+      }
+      #nameInput {
+        font-size: 1.2em;
+        padding: 5px;
+        width: 200px;
+        display: none;
+        border: none;
+        border-bottom: 2px solid white;
+        background: transparent;
+        color: white;
+      }
+      #nameInput::placeholder {
+        color: rgba(255, 255, 255, 0.7);
       }
       #chatContainer {
         display: flex;
@@ -25,8 +66,9 @@
       }
       #peerList {
         width: 200px;
-        border-right: 1px solid #ccc;
+        border-right: 1px solid var(--primary-light);
         overflow-y: auto;
+        background-color: var(--primary-light);
       }
       #peerList div {
         padding: 10px;
@@ -36,10 +78,10 @@
         align-items: center;
       }
       #peerList div:hover {
-        background-color: #f0f0f0;
+        background-color: #e6e6eb;
       }
       #peerList div.active {
-        background-color: #e0e0e0;
+        background-color: #d1d1db;
       }
       #chatArea {
         flex-grow: 1;
@@ -54,21 +96,37 @@
       #inputArea {
         display: flex;
         padding: 10px;
+        background-color: var(--primary-light);
       }
       #messageInput {
         flex-grow: 1;
+        padding: 10px;
         margin-right: 10px;
+        resize: none;
+        border: 1px solid var(--primary-color);
+        border-radius: 5px;
+      }
+      #sendButton {
+        padding: 10px 20px;
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      #sendButton:hover {
+        background-color: var(--primary-dark);
       }
       .sent {
         text-align: right;
-        color: blue;
+        color: var(--primary-dark);
       }
       .received {
         text-align: left;
-        color: green;
+        color: var(--primary-color);
       }
       .unread-count {
-        background-color: #ff4444;
+        background-color: #d9534f;
         color: white;
         border-radius: 50%;
         padding: 2px 6px;
@@ -77,22 +135,28 @@
     </style>
   </head>
   <body>
-    <div id="myName">Your Name: <span id="displayName">Anonymous</span></div>
-    <div id="nameSection">
-      <input type="text" id="nameInput" placeholder="Enter your name" />
-      <button onclick="setName()">Set Name</button>
+    <div id="welcomeSection">
+      <span id="welcomeMessage">Welcome,</span>
+      <span id="nameDisplay">Anonymous</span>
+      <button id="editNameBtn" onclick="toggleNameEdit()">✏️</button>
+      <input
+        type="text"
+        id="nameInput"
+        placeholder="Enter your name"
+        onblur="setName()"
+      />
     </div>
     <div id="chatContainer">
       <div id="peerList"></div>
       <div id="chatArea">
         <div id="messages"></div>
         <div id="inputArea">
-          <input
-            type="text"
+          <textarea
             id="messageInput"
             placeholder="Type a message"
             disabled
-          />
+            rows="3"
+          ></textarea>
           <button onclick="sendMessage()" id="sendButton" disabled>Send</button>
         </div>
       </div>
@@ -133,7 +197,7 @@
           case "name_updated":
             if (msg.fromId === myId) {
               myName = msg.content;
-              document.getElementById("displayName").textContent = myName;
+              document.getElementById("nameDisplay").textContent = myName;
             } else {
               peerNames[msg.fromId] = msg.content;
               updatePeerList();
@@ -210,17 +274,42 @@
         }
       }
 
+      function toggleNameEdit() {
+        const nameDisplay = document.getElementById("nameDisplay");
+        const nameInput = document.getElementById("nameInput");
+        const editNameBtn = document.getElementById("editNameBtn");
+
+        if (
+          nameInput.style.display === "none" ||
+          nameInput.style.display === ""
+        ) {
+          nameDisplay.style.display = "none";
+          nameInput.style.display = "inline-block";
+          nameInput.value = myName;
+          nameInput.focus();
+          editNameBtn.textContent = "✔️";
+        } else {
+          setName();
+        }
+      }
+
       function setName() {
         const nameInput = document.getElementById("nameInput");
+        const nameDisplay = document.getElementById("nameDisplay");
+        const editNameBtn = document.getElementById("editNameBtn");
         const name = nameInput.value.trim();
-        if (name) {
+
+        if (name && name !== myName) {
           const message = {
             type: "set_name",
             content: name,
           };
           ws.send(JSON.stringify(message));
-          nameInput.value = "";
         }
+
+        nameInput.style.display = "none";
+        nameDisplay.style.display = "inline";
+        editNameBtn.textContent = "✏️";
       }
 
       function incrementUnreadCount(peerId) {
@@ -259,8 +348,9 @@
       // Enable sending message with Enter key
       document
         .getElementById("messageInput")
-        .addEventListener("keypress", function (e) {
-          if (e.key === "Enter") {
+        .addEventListener("keydown", function (e) {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
             sendMessage();
           }
         });
