@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package directory;
+
+option go_package = "github.com/justine-george/nexus-decentralized-messaging/proto";
+
+service DirectoryService {
+  rpc RegisterPeer (RegisterRequest) returns (RegisterResponse) {}
+  rpc UnregisterPeer (UnregisterRequest) returns (UnregisterResponse) {}
+  rpc GetPeers (GetPeersRequest) returns (GetPeersResponse) {}
+}
+
+message PeerInfo {
+  string id = 1;
+  string address = 2;
+}
+
+message RegisterRequest {
+  string id = 1;
+  string address = 2;
+}
+
+message RegisterResponse {
+  bool success = 1;
+}
+
+message UnregisterRequest {
+  string id = 1;
+}
+
+message UnregisterResponse {
+  bool success = 1;
+}
+
+message GetPeersRequest {}
+
+message GetPeersResponse {
+  repeated PeerInfo peers = 1;
+}

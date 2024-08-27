@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nexus
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nexus
+  template:
+    metadata:
+      labels:
+        app: nexus
+    spec:
+      containers:
+        - name: nexus
+          image: yourusername/nexus:latest
+          ports:
+            - containerPort: 8443
+            - containerPort: 50051
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nexus
+spec:
+  selector:
+    app: nexus
+  ports:
+    - name: https
+      port: 443
+      targetPort: 8443
+    - name: grpc
+      port: 50051
+      targetPort: 50051
+  type: LoadBalancer
