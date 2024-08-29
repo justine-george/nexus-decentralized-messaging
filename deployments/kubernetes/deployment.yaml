@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: nexus
-          image: yourusername/nexus:latest
+          image: justine-george/nexus:latest
           ports:
             - containerPort: 8443
             - containerPort: 50051
